@@ -54,7 +54,7 @@ builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblies(AppDomain.
 // Register repositories
 builder.Services.AddScoped<IPatientRepository, PatientRepository>();
 var key = Encoding.ASCII.GetBytes(builder.Configuration["Jwt:Key"]);
-// Add JWT authentication
+// Add JWT authentication for auth
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
