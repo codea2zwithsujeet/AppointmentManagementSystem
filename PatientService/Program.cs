@@ -1,13 +1,16 @@
-using Microsoft.Extensions.DependencyInjection;
 using PatientService.Data;
 using Microsoft.EntityFrameworkCore;
 using PatientService.Repositories;
-using MediatR;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using Microsoft.OpenApi.Models;
 using PatientService.Services;
+using AMS.Common.Middleware.Extensions;
+using Serilog.Sinks.PostgreSQL;
+using Serilog;
+using Npgsql;
+using NpgsqlTypes;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -79,6 +82,38 @@ builder.Services.AddSingleton<CircuitBreakerService>();
 
 builder.Services.AddAuthorization();
 
+// Read connection string from appsettings.json
+string connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+
+// Define the columns and their types for logging
+var columnWriters = new Dictionary<string, ColumnWriterBase>
+{
+    { "Timestamp", new TimestampColumnWriter(NpgsqlDbType.Timestamp) },
+    { "Level", new LevelColumnWriter(true, NpgsqlDbType.Varchar) },
+    { "Message", new RenderedMessageColumnWriter(NpgsqlDbType.Text) },
+    { "Exception", new ExceptionColumnWriter(NpgsqlDbType.Text) },
+    { "Properties", new PropertiesColumnWriter(NpgsqlDbType.Jsonb) }
+};
+
+// Configure Serilog
+Log.Logger = new LoggerConfiguration()
+    .WriteTo.Console()
+    .WriteTo.PostgreSQL(
+        connectionString: connectionString,
+        tableName: "Logs",
+        columnOptions: new Dictionary<string, ColumnWriterBase>
+        {
+            { "Timestamp", new TimestampColumnWriter(NpgsqlTypes.NpgsqlDbType.Timestamp) },
+            { "Level", new LevelColumnWriter(true, NpgsqlTypes.NpgsqlDbType.Varchar) },
+            { "Message", new RenderedMessageColumnWriter(NpgsqlTypes.NpgsqlDbType.Text) },
+            { "Exception", new ExceptionColumnWriter(NpgsqlTypes.NpgsqlDbType.Text) },
+            { "Properties", new PropertiesColumnWriter(NpgsqlTypes.NpgsqlDbType.Jsonb) }
+        })
+    .CreateLogger();
+
+builder.Host.UseSerilog();
+
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -88,6 +123,10 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.UseSwagger();
 app.UseSwaggerUI();
+
+// Order matters: Logging before Exception Handling
+app.UseRequestLogging();
+app.UseGlobalExceptionHandling();
 
 app.MapControllers();
 

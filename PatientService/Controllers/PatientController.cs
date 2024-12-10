@@ -23,7 +23,7 @@ namespace PatientService.Controllers
         }
 
         [HttpGet]
-        [Authorize(Roles = "Admin1")]
+        [Authorize(Roles = "Admin")]
         public async Task<ActionResult<IEnumerable<PatientDto>>> GetPatients()
         {
             var query = new GetPatientsQuery();
